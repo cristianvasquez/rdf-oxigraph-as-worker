@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Oxigraph as worker</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 0 20px;
+        }
+
+        #results {
+            white-space: pre-wrap;
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+
+        button {
+            margin: 5px;
+            padding: 8px 16px;
+        }
+
+        textarea {
+            width: 100%;
+            height: 100px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+
+<body>
+<h1>Oxigraph as worker</h1>
+
+<div>
+    <h3>Load Data (Turtle Format)</h3>
+    <textarea id="loadData" placeholder="Enter Turtle data here...">
+@prefix ex: <http://example.org/> .
+@prefix schema: <http://schema.org/> .
+
+# The Tea Party
+ex:MadTeaParty a schema:Event ;
+    schema:name "The Mad Hatter's Tea Party" ;
+    schema:location ex:WonderlandGarden ;
+    schema:performer ex:MadHatter, ex:MarchHare, ex:Dormouse .
+    </textarea>
+    <br>
+    <button id="loadButton">Load Data</button>
+</div>
+
+<div>
+    <h3>Run SPARQL Query</h3>
+    <textarea id="queryInput" placeholder="Enter your SPARQL query here...">
+
+SELECT * WHERE {
+    ?s ?p ?o
+}
+    </textarea>
+    <br>
+    <button id="queryButton">Run Query</button>
+</div>
+
+<div>
+    <h3>Results:</h3>
+    <div id="results"></div>
+</div>
+
+<script type="module">
+  let worker
+  let messageCallbacks = new Map()
+  let lastMessageId = 0
+
+  function initWorker () {
+    console.log('Initializing worker...')
+    worker = new Worker(new URL('./src/worker.js', import.meta.url), { type: 'module' })
+
+    worker.onmessage = (e) => {
+      console.log('Message received from worker:', e.data)
+      const { type, payload, id } = e.data
+
+      if (type === 'RESULT') {
+        const callback = messageCallbacks.get(id)
+        if (callback) {
+          callback.resolve(payload)
+          messageCallbacks.delete(id)
+        }
+      } else if (type === 'ERROR') {
+        const callback = messageCallbacks.get(id)
+        if (callback) {
+          callback.reject(new Error(payload))
+          messageCallbacks.delete(id)
+        }
+      }
+    }
+  }
+
+  function getNextMessageId () {
+    lastMessageId++
+    return lastMessageId
+  }
+
+  function loadData (data) {
+    return new Promise((resolve, reject) => {
+      const messageId = getNextMessageId()
+      messageCallbacks.set(messageId, { resolve, reject })
+      worker.postMessage({ type: 'LOAD_DATA', payload: data, id: messageId })
+    })
+  }
+
+  function runQuery (query) {
+    return new Promise((resolve, reject) => {
+      const messageId = getNextMessageId()
+      messageCallbacks.set(messageId, { resolve, reject })
+      worker.postMessage({ type: 'RUN_QUERY', payload: query, id: messageId })
+    })
+  }
+
+  initWorker()
+
+  document.addEventListener('DOMContentLoaded', () => {
+
+    document.getElementById('loadButton').onclick = async () => {
+      const data = document.getElementById('loadData').value
+      try {
+        await loadData(data)
+        document.getElementById('results').textContent = 'Data loaded successfully!'
+      } catch (error) {
+        document.getElementById('results').textContent = `Error: ${error.message}`
+      }
+    }
+
+    document.getElementById('queryButton').onclick = async () => {
+      const queryText = document.getElementById('queryInput').value
+      try {
+        const results = await runQuery(queryText)
+        document.getElementById('results').textContent = `Query Result: ${JSON.stringify(results, null, 2)}`
+      } catch (error) {
+        document.getElementById('results').textContent = `Error: ${error.message}`
+      }
+    }
+  })
+</script>
+</body>
+
+</html>

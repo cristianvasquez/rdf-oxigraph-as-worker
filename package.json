@@ -1,0 +1,20 @@
+{
+  "name": "oxygraph-webworker",
+  "version": "0.0.1",
+  "main": "index.js",
+  "author": "Cristian Vasquez",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "n3": "^1.23.1",
+    "oxigraph": "^0.4.4",
+    "rdflib": "^2.2.35"
+  },
+  "devDependencies": {
+    "vite": "^6.0.4"
+  }
+}
