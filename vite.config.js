@@ -1,4 +1,5 @@
 export default {
+  base: './', // Ensure assets use relative paths
   optimizeDeps: {
     exclude: ['oxigraph'],
   },
@@ -8,5 +9,4 @@ export default {
   define: {
     'global': {},
   },
-
 }
